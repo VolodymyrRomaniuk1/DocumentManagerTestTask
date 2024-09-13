@@ -4,9 +4,8 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.time.Instant;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * For implement this task focus on clear code, and make this solution as simple readable as possible
@@ -19,6 +18,9 @@ import java.util.Optional;
  */
 public class DocumentManager {
 
+    // Map for storing documents
+    private final Map<String, Document> documentStorage = new HashMap<>();
+
     /**
      * Implementation of this method should upsert the document to your storage
      * And generate unique id if it does not exist, don't change [created] field
@@ -27,8 +29,11 @@ public class DocumentManager {
      * @return saved document
      */
     public Document save(Document document) {
-
-        return null;
+        if (document.getId() == null) {
+            document.setId(UUID.randomUUID().toString()); // Generate unique ID (UUID)
+        }
+        documentStorage.put(document.getId(), document);
+        return document;
     }
 
     /**
@@ -38,8 +43,12 @@ public class DocumentManager {
      * @return list matched documents
      */
     public List<Document> search(SearchRequest request) {
-
-        return Collections.emptyList();
+        return documentStorage.values().stream()
+                .filter(doc -> filterByTitlePrefixes(doc, request.getTitlePrefixes()))
+                .filter(doc -> filterByContentContains(doc, request.getContainsContents()))
+                .filter(doc -> filterByAuthorIds(doc, request.getAuthorIds()))
+                .filter(doc -> filterByCreatedRange(doc, request.getCreatedFrom(), request.getCreatedTo()))
+                .collect(Collectors.toList());
     }
 
     /**
@@ -49,8 +58,46 @@ public class DocumentManager {
      * @return optional document
      */
     public Optional<Document> findById(String id) {
+        return Optional.ofNullable(documentStorage.get(id));
+    }
 
-        return Optional.empty();
+    // Filtering of individual fields of SearchRequest is separated into methods to improve code readability
+
+    private boolean filterByTitlePrefixes(Document document, List<String> titlePrefixes) {
+        if (titlePrefixes == null || titlePrefixes.isEmpty()) {
+            return true;
+        }
+
+        return titlePrefixes.stream().anyMatch(prefix -> document.getTitle().startsWith(prefix));
+    }
+
+    private boolean filterByContentContains(Document document, List<String> containsContents) {
+        if (containsContents == null || containsContents.isEmpty()) {
+            return true;
+        }
+
+        return containsContents.stream().anyMatch(content -> document.getContent().contains(content));
+    }
+
+    private boolean filterByAuthorIds(Document document, List<String> authorIds) {
+        if (authorIds == null || authorIds.isEmpty()) {
+            return true;
+        }
+
+        return authorIds.contains(document.getAuthor().getId());
+    }
+
+    private boolean filterByCreatedRange(Document document, Instant createdFrom, Instant createdTo) {
+        Instant created = document.getCreated();
+        if (createdFrom != null && created.isBefore(createdFrom)) {
+            return false;
+        }
+
+        if (createdTo != null && created.isAfter(createdTo)) {
+            return false;
+        }
+
+        return true;
     }
 
     @Data
